@@ -23,7 +23,7 @@ INFERENCE_WIDTH   = 640
 INFERENCE_HEIGHT  = 480
 
 # ── detection filters ─────────────────────────────────────────────────────────
-ALLOWED_CLASSES   = {0}
+ALLOWED_CLASSES   = {0, 1, 2, 3, 4}
 BLACKLIST_CLASSES = set()
 MIN_BBOX_AREA     = 3000
 MAX_BBOX_AREA     = 550000
