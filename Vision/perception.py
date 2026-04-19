@@ -31,25 +31,28 @@ BOUNDARY_AXIS = 'x'
 BOUNDARY_POS  = 0.5
 INWARD_DIR    = 'right'
 
-# ── detection mode ────────────────────────────────────────────────────────────
-DETECTION_MODE = 'side_snap'   # 'side_snap' or 'velocity'
+# ── zone tracker config ───────────────────────────────────────────────────────
+# A buffer zone of ZONE_WIDTH px sits on each side of the boundary line.
+# An object must fully EXIT the zone on the far side before an event fires.
+# This means bbox growth toward the line, or a brief feed drop mid-crossing,
+# cannot cause duplicate or phantom events.
+#
+#   near side  |  zone  |  line  |  zone  |  far side
+#              <-ZONE_WIDTH->    <-ZONE_WIDTH->
+#
+ZONE_WIDTH = 120         # px each side of the line — raise if still getting noise
 
-# velocity mode tuning
-CROSSING_MARGIN = 40
-MIN_VELOCITY    = 4
-HISTORY_LEN     = 24
-SMOOTH_ALPHA    = 0.4
+# ADD throttle — seconds before same class can ADD again regardless of track ID
+ADD_COOLDOWN_SEC  = 3.0
 
-# side_snap mode tuning
-SNAP_WINDOW_SEC  = 2.5   # seconds a vanished track is held for re-linking
-ADD_COOLDOWN_SEC = 3.0   # seconds before another ADD can fire for the same class
-                          # REMOVE has no cooldown — you can always take something out
+# how long a lost track's last state is remembered for re-linking
+STATE_MEMORY_SEC  = 3.0
 
-# shared
-EVENT_COOLDOWN = 60
+# shared event config
+EVENT_COOLDOWN = 45      # frames before same track can fire again
 MAX_EVENT_LOG  = 8
 
-# ── track bridge ──────────────────────────────────────────────────────────────
+# track bridge
 RELINK_RADIUS  = 120
 RELINK_TIMEOUT = 90
 # ─────────────────────────────────────────────────────────────────────────────
@@ -61,20 +64,58 @@ model(np.zeros((INFERENCE_HEIGHT, INFERENCE_WIDTH, 3), dtype=np.uint8), verbose=
 print("MPS ready")
 
 
-# ── helpers ───────────────────────────────────────────────────────────────────
-def _boundary_line() -> float:
+# ── boundary helpers ──────────────────────────────────────────────────────────
+def _line() -> float:
     return (BOUNDARY_POS * INFERENCE_HEIGHT if BOUNDARY_AXIS == 'y'
             else BOUNDARY_POS * INFERENCE_WIDTH)
 
-def _which_side(cx: float, cy: float) -> str:
-    val = cy if BOUNDARY_AXIS == 'y' else cx
-    return 'near' if val < _boundary_line() else 'far'
+def _zone_near() -> float:
+    return _line() - ZONE_WIDTH
+
+def _zone_far() -> float:
+    return _line() + ZONE_WIDTH
+
+def _axis_val_leading(bbox) -> float:
+    """
+    The leading edge of the bbox in the direction of travel.
+    Used to decide when the object has fully exited the zone.
+    For INWARD (right/down): leading edge = right or bottom of bbox.
+    For OUTWARD (left/up):   leading edge = left or top of bbox.
+    """
+    x1, y1, x2, y2 = bbox
+    if BOUNDARY_AXIS == 'x':
+        return x2 if INWARD_DIR == 'right' else x1
+    else:
+        return y2 if INWARD_DIR == 'down' else y1
+
+def _axis_val_trailing(bbox) -> float:
+    """
+    The trailing edge — last part of the object to cross.
+    Used to confirm the object has fully left the origin side.
+    """
+    x1, y1, x2, y2 = bbox
+    if BOUNDARY_AXIS == 'x':
+        return x1 if INWARD_DIR == 'right' else x2
+    else:
+        return y1 if INWARD_DIR == 'down' else y2
+
+def _centroid_axis(cx, cy) -> float:
+    return cx if BOUNDARY_AXIS == 'x' else cy
+
+def _region(val: float) -> str:
+    """Which region is this axis value in: 'near', 'zone', or 'far'."""
+    if val < _zone_near():
+        return 'near'
+    elif val > _zone_far():
+        return 'far'
+    else:
+        return 'zone'
 
 def _inward_side() -> str:
     return 'far' if INWARD_DIR in ('right', 'down') else 'near'
 
-def _side_to_event(side: str) -> str:
-    return 'ADD' if side == _inward_side() else 'REMOVE'
+def _side_to_event(destination: str) -> str:
+    return 'ADD' if destination == _inward_side() else 'REMOVE'
 
 
 # ── track bridge ──────────────────────────────────────────────────────────────
@@ -91,24 +132,24 @@ class TrackBridge:
         for tid in expired:
             self.lost.pop(tid, None)
 
-    def mark_lost(self, track_id: int, cx: float, cy: float, cls: str):
-        self.lost[track_id] = {'cx': cx, 'cy': cy, 'cls': cls,
-                                'frame': self.frame_count}
+    def mark_lost(self, tid: int, cx: float, cy: float, cls: str):
+        self.lost[tid] = {'cx': cx, 'cy': cy, 'cls': cls,
+                           'frame': self.frame_count}
 
-    def resolve(self, track_id: int, cx: float, cy: float, cls: str) -> int:
-        if track_id in self.remap:
-            return self.remap[track_id]
+    def resolve(self, tid: int, cx: float, cy: float, cls: str) -> int:
+        if tid in self.remap:
+            return self.remap[tid]
         best_id, best_dist = None, float('inf')
         for lost_id, v in self.lost.items():
-            dist = ((cx - v['cx']) ** 2 + (cy - v['cy']) ** 2) ** 0.5
-            if dist < best_dist:
-                best_dist, best_id = dist, lost_id
+            d = ((cx - v['cx']) ** 2 + (cy - v['cy']) ** 2) ** 0.5
+            if d < best_dist:
+                best_dist, best_id = d, lost_id
         if best_id is not None and best_dist < RELINK_RADIUS:
-            self.remap[track_id] = best_id
+            self.remap[tid] = best_id
             self.lost.pop(best_id, None)
-            print(f"[bridge] relinked #{track_id} → #{best_id}  ({best_dist:.0f}px)")
+            print(f"[bridge] relinked #{tid} → #{best_id}  ({best_dist:.0f}px)")
             return best_id
-        return track_id
+        return tid
 
     def cleanup(self, active_ids: set):
         stale = [k for k, v in self.remap.items()
@@ -117,107 +158,58 @@ class TrackBridge:
             self.remap.pop(tid, None)
 
 
-# ── approach 1 : velocity crossing ───────────────────────────────────────────
-class VelocityTracker:
+# ── zone state machine ────────────────────────────────────────────────────────
+class ZoneTracker:
+    """
+    Each track has a state: 'near', 'zone_from_near', 'zone_from_far', 'far'.
+    
+    The zone states carry memory of which side the object came FROM.
+    An event only fires when the object fully exits the zone on the opposite side.
+    
+    State transitions:
+      near → zone_from_near   : entered buffer from near side (no event)
+      zone_from_near → near   : retreated back to near side  (cancelled)
+      zone_from_near → far    : fully crossed → fire ADD or REMOVE
+      
+      far → zone_from_far     : entered buffer from far side (no event)
+      zone_from_far → far     : retreated back to far side   (cancelled)
+      zone_from_far → near    : fully crossed → fire ADD or REMOVE
+      
+    Feed drop handling:
+      If a track disappears while in zone_from_near and reappears in 'far',
+      we restore its zone_from_near state from memory and complete the crossing.
+    """
+
+    # internal state constants
+    NEAR           = 'near'
+    FAR            = 'far'
+    ZONE_FROM_NEAR = 'zone_from_near'
+    ZONE_FROM_FAR  = 'zone_from_far'
+
     def __init__(self):
-        self.histories:    dict[int, deque] = defaultdict(lambda: deque(maxlen=HISTORY_LEN))
-        self.smoothed:     dict[int, tuple] = {}
-        self.last_side:    dict[int, str]   = {}
-        self.cross_origin: dict[int, float] = {}
-        self.cooldowns:    dict[int, int]   = defaultdict(int)
+        self.states:        dict[int, str]   = {}
+        self.classes:       dict[int, str]   = {}
+        self.cooldowns:     dict[int, int]   = defaultdict(int)
+        self.last_add_time: dict[str, float] = {}
+        # memory of recently-lost track states for feed-drop recovery
+        self.lost_states:   dict[int, dict]  = {}
 
-    def update(self, track_id: int, cx: int, cy: int):
-        if self.cooldowns[track_id] > 0:
-            self.cooldowns[track_id] -= 1
-
-        if track_id not in self.smoothed:
-            self.smoothed[track_id] = (float(cx), float(cy))
-        else:
-            sx, sy = self.smoothed[track_id]
-            self.smoothed[track_id] = (
-                SMOOTH_ALPHA * cx + (1 - SMOOTH_ALPHA) * sx,
-                SMOOTH_ALPHA * cy + (1 - SMOOTH_ALPHA) * sy,
-            )
-        sx, sy = self.smoothed[track_id]
-        self.histories[track_id].append((sx, sy))
-
-        current_side = _which_side(sx, sy)
-        prev_side    = self.last_side.get(track_id)
-
-        if prev_side is not None and prev_side != current_side:
-            self.cross_origin[track_id] = _boundary_line()
-
-        self.last_side[track_id] = current_side
-
-        if track_id not in self.cross_origin:
-            return None
-
-        dist_past = abs(
-            (sy if BOUNDARY_AXIS == 'y' else sx) - self.cross_origin[track_id]
-        )
-        if dist_past < CROSSING_MARGIN:
-            return None
-
-        pts = list(self.histories[track_id])
-        if len(pts) < 4:
-            return None
-        n  = len(pts) - 1
-        vx = (pts[-1][0] - pts[0][0]) / n
-        vy = (pts[-1][1] - pts[0][1]) / n
-        speed = abs(vy) if BOUNDARY_AXIS == 'y' else abs(vx)
-        if speed < MIN_VELOCITY:
-            self.cross_origin.pop(track_id, None)
-            return None
-
-        if self.cooldowns[track_id] > 0:
-            self.cross_origin.pop(track_id, None)
-            return None
-
-        self.cross_origin.pop(track_id, None)
-        self.cooldowns[track_id] = EVENT_COOLDOWN
-        return _side_to_event(current_side)
-
-    def cleanup(self, active_ids: set):
-        gone = set(self.histories) - active_ids
-        for tid in gone:
-            self.histories.pop(tid, None)
-            self.smoothed.pop(tid, None)
-            self.last_side.pop(tid, None)
-            self.cross_origin.pop(tid, None)
-            self.cooldowns.pop(tid, None)
-
-
-# ── approach 2 : side snapshot ────────────────────────────────────────────────
-class SideSnapTracker:
-    def __init__(self):
-        self.sides:          dict[int, str]   = {}
-        self.classes:        dict[int, str]   = {}
-        self.cooldowns:      dict[int, int]   = defaultdict(int)
-        self.recently_left:  dict[str, list]  = defaultdict(list)
-        self.last_add_time:  dict[str, float] = {}  # class → timestamp of last ADD
-
-    def _expire(self):
+    def _expire_lost(self):
         now = time.time()
-        for side in list(self.recently_left):
-            self.recently_left[side] = [
-                (cls, tid, t) for cls, tid, t in self.recently_left[side]
-                if now - t < SNAP_WINDOW_SEC
-            ]
+        self.lost_states = {
+            tid: v for tid, v in self.lost_states.items()
+            if now - v['time'] < STATE_MEMORY_SEC
+        }
 
     def _try_fire(self, events: list, event_type: str, cls: str, tid: int):
-        """
-        Gate for ADD events — enforces ADD_COOLDOWN_SEC between consecutive
-        ADDs of the same class. REMOVE always fires immediately.
-        """
         if event_type == 'ADD':
-            last = self.last_add_time.get(cls, 0.0)
-            if time.time() - last < ADD_COOLDOWN_SEC:
-                return   # too soon, swallow the event
+            if time.time() - self.last_add_time.get(cls, 0.0) < ADD_COOLDOWN_SEC:
+                return
             self.last_add_time[cls] = time.time()
         events.append((event_type, cls, tid))
 
     def update(self, detections: list) -> list:
-        self._expire()
+        self._expire_lost()
         for tid in list(self.cooldowns):
             if self.cooldowns[tid] > 0:
                 self.cooldowns[tid] -= 1
@@ -229,47 +221,100 @@ class SideSnapTracker:
             tid = det['track_id']
             if tid == -1:
                 continue
-            cx, cy        = det['centroid']
-            cls           = det['class']
+
+            bbox  = det['bbox']
+            cls   = det['class']
+            cx, cy = det['centroid']
             current_ids.add(tid)
-            self.classes[tid]  = cls
-            current_side       = _which_side(cx, cy)
-            prev_side          = self.sides.get(tid)
-            self.sides[tid]    = current_side
+            self.classes[tid] = cls
 
-            if prev_side is None:
-                # new track — check if same class recently left the other side
-                other_side = 'far' if current_side == 'near' else 'near'
-                match_idx  = next(
-                    (i for i, (c, _, _) in enumerate(self.recently_left[other_side])
-                     if c == cls),
-                    None
-                )
-                if match_idx is not None and self.cooldowns[tid] == 0:
-                    self.recently_left[other_side].pop(match_idx)
-                    self.cooldowns[tid] = EVENT_COOLDOWN
-                    self._try_fire(events, _side_to_event(current_side), cls, tid)
+            # use centroid axis value to determine current region
+            val          = _centroid_axis(cx, cy)
+            region       = _region(val)
+            prev_state   = self.states.get(tid)
 
-            elif prev_side != current_side and self.cooldowns[tid] == 0:
-                # existing track switched sides
-                self.cooldowns[tid] = EVENT_COOLDOWN
-                self._try_fire(events, _side_to_event(current_side), cls, tid)
+            # ── new track: restore lost state if available ────────────────
+            if prev_state is None:
+                lost = self.lost_states.pop(tid, None)
+                if lost:
+                    prev_state = lost['state']
+                    print(f"[zone] restored state '{prev_state}' for #{tid}")
 
-        # mark disappeared tracks
-        gone = set(self.sides) - current_ids
+            # ── initialise brand-new track with no history ─────────────────
+            if prev_state is None:
+                if region == 'near':
+                    self.states[tid] = self.NEAR
+                elif region == 'far':
+                    self.states[tid] = self.FAR
+                else:
+                    # appeared inside the zone — can't know which side it came from
+                    # wait until it moves to a clear region before tracking
+                    self.states[tid] = self.ZONE_FROM_NEAR  # conservative assumption
+                continue
+
+            # ── state machine transitions ─────────────────────────────────
+            new_state = prev_state
+
+            if prev_state == self.NEAR:
+                if region == 'zone':
+                    new_state = self.ZONE_FROM_NEAR
+                elif region == 'far':
+                    # jumped directly across (fast movement / frame skip)
+                    # treat as committed crossing
+                    new_state = self.FAR
+                    if self.cooldowns[tid] == 0:
+                        self.cooldowns[tid] = EVENT_COOLDOWN
+                        self._try_fire(events, _side_to_event(self.FAR), cls, tid)
+
+            elif prev_state == self.ZONE_FROM_NEAR:
+                if region == 'near':
+                    new_state = self.NEAR    # retreated — cancel
+                elif region == 'far':
+                    # fully exited zone on the far side — commit crossing
+                    new_state = self.FAR
+                    if self.cooldowns[tid] == 0:
+                        self.cooldowns[tid] = EVENT_COOLDOWN
+                        self._try_fire(events, _side_to_event(self.FAR), cls, tid)
+                # staying in zone: keep state, wait for exit
+
+            elif prev_state == self.FAR:
+                if region == 'zone':
+                    new_state = self.ZONE_FROM_FAR
+                elif region == 'near':
+                    new_state = self.NEAR
+                    if self.cooldowns[tid] == 0:
+                        self.cooldowns[tid] = EVENT_COOLDOWN
+                        self._try_fire(events, _side_to_event(self.NEAR), cls, tid)
+
+            elif prev_state == self.ZONE_FROM_FAR:
+                if region == 'far':
+                    new_state = self.FAR     # retreated — cancel
+                elif region == 'near':
+                    new_state = self.NEAR
+                    if self.cooldowns[tid] == 0:
+                        self.cooldowns[tid] = EVENT_COOLDOWN
+                        self._try_fire(events, _side_to_event(self.NEAR), cls, tid)
+
+            self.states[tid] = new_state
+
+        # ── save state for disappeared tracks ─────────────────────────────
+        gone = set(self.states) - current_ids
         for tid in gone:
-            side = self.sides.pop(tid)
-            cls  = self.classes.pop(tid, 'unknown')
-            self.recently_left[side].append((cls, tid, time.time()))
+            state = self.states.pop(tid)
+            cls   = self.classes.pop(tid, 'unknown')
+            self.lost_states[tid] = {'state': state, 'cls': cls, 'time': time.time()}
             self.cooldowns.pop(tid, None)
 
         return events
 
     def cleanup(self, active_ids: set):
-        gone = set(self.sides) - active_ids
+        gone = set(self.states) - active_ids
         for tid in gone:
-            self.sides.pop(tid, None)
+            self.states.pop(tid, None)
             self.classes.pop(tid, None)
+
+    def get_state(self, tid: int) -> str:
+        return self.states.get(tid, '?')
 
 
 # ── preprocessing ─────────────────────────────────────────────────────────────
@@ -343,46 +388,41 @@ def run_inference(frame):
 
 
 # ── drawing ───────────────────────────────────────────────────────────────────
+STATE_COLORS = {
+    ZoneTracker.NEAR:           (160, 160, 160),
+    ZoneTracker.FAR:            (0,   200, 100),
+    ZoneTracker.ZONE_FROM_NEAR: (0,   200, 255),
+    ZoneTracker.ZONE_FROM_FAR:  (0,   140, 255),
+}
+
 def draw_boundary(frame):
-    if BOUNDARY_AXIS == 'y':
-        y = int(BOUNDARY_POS * INFERENCE_HEIGHT)
-        cv2.line(frame, (0, y), (INFERENCE_WIDTH, y), (0, 200, 255), 2)
-        cv2.putText(frame, f"boundary ({DETECTION_MODE})",
-                    (8, y - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 200, 255), 1)
-    else:
-        x = int(BOUNDARY_POS * INFERENCE_WIDTH)
-        cv2.line(frame, (x, 0), (x, INFERENCE_HEIGHT), (0, 200, 255), 2)
-        cv2.putText(frame, f"boundary ({DETECTION_MODE})",
-                    (x + 6, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 200, 255), 1)
+    line  = int(_line())
+    znear = int(_zone_near())
+    zfar  = int(_zone_far())
 
-def draw_trails(frame, vel_tracker: VelocityTracker, active_ids: set):
-    for tid in active_ids:
-        hist = vel_tracker.histories.get(tid)
-        if not hist:
-            continue
-        pts = [(int(x), int(y)) for x, y in hist]
-        for i in range(1, len(pts)):
-            alpha = i / len(pts)
-            cv2.line(frame, pts[i - 1], pts[i],
-                     (int(255 * alpha), int(180 * alpha), 0), 1)
-
-def draw_side_labels(frame, snap_tracker: SideSnapTracker):
-    near = sum(1 for s in snap_tracker.sides.values() if s == 'near')
-    far  = sum(1 for s in snap_tracker.sides.values() if s == 'far')
     if BOUNDARY_AXIS == 'x':
-        lx = int(BOUNDARY_POS * INFERENCE_WIDTH)
-        cv2.putText(frame, f"outside: {near}",
-                    (max(4, lx - 120), INFERENCE_HEIGHT - 40),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1)
-        cv2.putText(frame, f"inside: {far}",
-                    (lx + 8, INFERENCE_HEIGHT - 40),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1)
+        # zone shading
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (znear, 0), (zfar, INFERENCE_HEIGHT),
+                      (0, 200, 255), -1)
+        cv2.addWeighted(overlay, 0.08, frame, 0.92, 0, frame)
+        # zone edges
+        cv2.line(frame, (znear, 0), (znear, INFERENCE_HEIGHT), (0, 200, 255), 1)
+        cv2.line(frame, (zfar,  0), (zfar,  INFERENCE_HEIGHT), (0, 200, 255), 1)
+        # centre line
+        cv2.line(frame, (line, 0), (line, INFERENCE_HEIGHT), (0, 200, 255), 2)
+        cv2.putText(frame, "zone", (line + 4, 18),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.38, (0, 200, 255), 1)
     else:
-        ly = int(BOUNDARY_POS * INFERENCE_HEIGHT)
-        cv2.putText(frame, f"near: {near}", (10, max(20, ly - 8)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1)
-        cv2.putText(frame, f"far: {far}", (10, ly + 20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1)
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (0, znear), (INFERENCE_WIDTH, zfar),
+                      (0, 200, 255), -1)
+        cv2.addWeighted(overlay, 0.08, frame, 0.92, 0, frame)
+        cv2.line(frame, (0, znear), (INFERENCE_WIDTH, znear), (0, 200, 255), 1)
+        cv2.line(frame, (0, zfar),  (INFERENCE_WIDTH, zfar),  (0, 200, 255), 1)
+        cv2.line(frame, (0, line),  (INFERENCE_WIDTH, line),  (0, 200, 255), 2)
+        cv2.putText(frame, "zone", (8, line - 6),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.38, (0, 200, 255), 1)
 
 def draw_event_log(frame, event_log: list):
     x_start = INFERENCE_WIDTH - 230
@@ -398,13 +438,9 @@ def draw_event_log(frame, event_log: list):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.48,
                     tuple(int(c * fade) for c in color), 1)
 
-def draw_frame(frame, detections, rejected, vel_tracker, snap_tracker,
-               active_ids, event_log, sharpness, fps, show_rejected):
+def draw_frame(frame, detections, rejected, zone_tracker,
+               event_log, sharpness, fps, show_rejected):
     draw_boundary(frame)
-    if DETECTION_MODE == 'velocity':
-        draw_trails(frame, vel_tracker, active_ids)
-    else:
-        draw_side_labels(frame, snap_tracker)
 
     if show_rejected:
         for r in rejected:
@@ -417,17 +453,19 @@ def draw_frame(frame, detections, rejected, vel_tracker, snap_tracker,
     for det in detections:
         x1, y1, x2, y2 = det['bbox']
         cx, cy          = det['centroid']
-        label = f"#{det['track_id']} {det['class']} {det['confidence']:.2f}"
-        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        tid             = det['track_id']
+        state           = zone_tracker.get_state(tid)
+        color           = STATE_COLORS.get(state, (0, 255, 0))
+        label           = f"#{tid} {det['class']} {det['confidence']:.2f} [{state}]"
+        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
         cv2.circle(frame, (cx, cy), 4, (0, 0, 255), -1)
-        cv2.line(frame, (cx - 12, cy), (cx + 12, cy), (255, 0, 0), 1)
-        cv2.line(frame, (cx, cy - 12), (cx, cy + 12), (255, 0, 0), 1)
         cv2.putText(frame, label, (x1, y1 - 8),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.38, color, 1)
 
     draw_event_log(frame, event_log)
-    hud = (f"{fps:.1f}fps  |  mode: {DETECTION_MODE}  "
-           f"|  tracking: {len(detections)}  |  events: {len(event_log)}")
+
+    hud = (f"{fps:.1f}fps  |  tracking: {len(detections)}  "
+           f"|  events: {len(event_log)}  |  zone: ±{ZONE_WIDTH}px")
     cv2.putText(frame, hud, (10, INFERENCE_HEIGHT - 26),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.42, (160, 160, 160), 1)
     cv2.putText(frame, "r = toggle rejected  q = quit",
@@ -459,8 +497,7 @@ def main():
     for _ in range(5):
         cap.read()
 
-    vel_tracker   = VelocityTracker()
-    snap_tracker  = SideSnapTracker()
+    zone_tracker  = ZoneTracker()
     bridge        = TrackBridge()
     event_log     = []
     inventory     = defaultdict(int)
@@ -470,7 +507,7 @@ def main():
     fps           = 0.0
     show_rejected = True
 
-    print(f"detection mode: {DETECTION_MODE}  |  ADD cooldown: {ADD_COOLDOWN_SEC}s")
+    print(f"zone width: ±{ZONE_WIDTH}px  |  ADD cooldown: {ADD_COOLDOWN_SEC}s")
     print("press q to quit, r to toggle rejected overlay")
 
     while True:
@@ -495,6 +532,7 @@ def main():
             cv2.putText(frame, "BLURRY", (10, 56),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
+        # bridge: remap re-identified tracks
         bridge.tick()
         active_ids = set()
         for det in detections:
@@ -507,31 +545,20 @@ def main():
             active_ids.add(canonical_id)
 
         for gone_id in prev_ids - active_ids:
-            hist = vel_tracker.histories.get(gone_id)
-            if hist:
-                lx, ly = hist[-1]
-                bridge.mark_lost(gone_id, lx, ly, 'bottle')
+            bridge.mark_lost(gone_id, 0, 0, 'bottle')
 
         bridge.cleanup(active_ids)
 
-        events = []
-        if DETECTION_MODE == 'velocity':
-            for det in detections:
-                ev = vel_tracker.update(det['track_id'], *det['centroid'])
-                if ev:
-                    events.append((ev, det['class'], det['track_id']))
-            vel_tracker.cleanup(active_ids)
-        else:
-            events = snap_tracker.update(detections)
-            snap_tracker.cleanup(active_ids)
+        # zone state machine
+        events = zone_tracker.update(detections)
+        zone_tracker.cleanup(active_ids)
 
         for event_type, cls, tid in events:
             inventory[cls] += (1 if event_type == 'ADD' else -1)
             event_log.append((event_type, cls, tid, time.time()))
             event_log = event_log[-MAX_EVENT_LOG:]
             print(f"\n{'─' * 50}")
-            print(f"  {event_type:6s}  |  class: {cls}  |  track #{tid}  "
-                  f"|  mode: {DETECTION_MODE}")
+            print(f"  {event_type:6s}  |  class: {cls}  |  track #{tid}")
             print(f"  inventory → {dict(inventory)}")
             print(f"{'─' * 50}\n")
 
@@ -541,9 +568,8 @@ def main():
         fps    = 0.9 * fps + 0.1 * (1.0 / max(now - t_prev, 1e-6))
         t_prev = now
 
-        frame = draw_frame(frame, detections, rejected, vel_tracker,
-                           snap_tracker, active_ids, event_log,
-                           sharpness, fps, show_rejected)
+        frame = draw_frame(frame, detections, rejected, zone_tracker,
+                           event_log, sharpness, fps, show_rejected)
         cv2.imshow('InventTrack — perception', frame)
 
         key = cv2.waitKey(1) & 0xFF
