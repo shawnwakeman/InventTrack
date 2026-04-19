@@ -1,0 +1,961 @@
+]<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InvenTrack — Your Fridge, Automated</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&family=Lora:ital,wght@0,400;0,600;1,400;1,600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f7f2;
+    --bg2: #eceee8;
+    --card: rgba(255,255,255,0.85);
+    --deep: #1a2415;
+    --forest: #2d4a20;
+    --moss: #4a7a32;
+    --sage: #8aab72;
+    --mint: #c8e6b8;
+    --glow: #6dde4a;
+    --warm: #e8622a;
+    --gold: #d4a017;
+    --sky: #3a8fd4;
+    --text: #1a2415;
+    --text2: #4a5e40;
+    --text3: #8aab72;
+    --border: rgba(42,74,32,0.1);
+    --r: 14px;
+    --r-lg: 22px;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content:'';
+    position:fixed; inset:0; z-index:-1;
+    background:
+      radial-gradient(ellipse 70% 50% at 0% 0%, rgba(109,222,74,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 60% at 100% 100%, rgba(42,74,32,0.06) 0%, transparent 60%),
+      var(--bg);
+  }
+
+  nav {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 52px;
+    position:sticky; top:0; z-index:100;
+    background:rgba(245,247,242,0.9);
+    backdrop-filter:blur(18px);
+    border-bottom:1px solid var(--border);
+  }
+
+  .logo {
+    display:flex; align-items:center; gap:10px;
+    font-family:'Syne',sans-serif; font-weight:800; font-size:20px;
+    color:var(--deep); text-decoration:none; letter-spacing:-.02em;
+  }
+
+  .logo-mark {
+    width:34px; height:34px;
+    background:var(--deep);
+    border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px;
+  }
+
+  nav ul { display:flex; gap:28px; list-style:none; }
+  nav ul a { font-size:14px; color:var(--text2); text-decoration:none; font-weight:500; transition:color .2s; }
+  nav ul a:hover { color:var(--forest); }
+
+  .nav-right { display:flex; gap:10px; align-items:center; }
+
+  .btn {
+    padding:9px 20px; border-radius:100px;
+    font-family:'Syne',sans-serif; font-size:13px; font-weight:600;
+    cursor:pointer; border:none; text-decoration:none; display:inline-block;
+    transition:all .2s; letter-spacing:.01em;
+  }
+  .btn-outline { background:transparent; color:var(--text2); border:1.5px solid rgba(42,74,32,0.2); }
+  .btn-outline:hover { background:var(--bg2); border-color:var(--sage); }
+  .btn-solid { background:var(--deep); color:white; }
+  .btn-solid:hover { background:var(--forest); transform:translateY(-1px); box-shadow:0 8px 24px rgba(26,36,21,0.22); }
+  .btn-green { background:var(--glow); color:var(--deep); font-weight:700; }
+  .btn-green:hover { transform:translateY(-1px); box-shadow:0 8px 24px rgba(109,222,74,0.35); }
+
+  .hero {
+    max-width:1200px; margin:0 auto;
+    padding:80px 52px 60px;
+    display:grid; grid-template-columns:1.1fr 0.9fr; gap:60px; align-items:center;
+  }
+
+  .hero-pill {
+    display:inline-flex; align-items:center; gap:7px;
+    background:rgba(109,222,74,0.12); border:1px solid rgba(109,222,74,0.3);
+    color:var(--forest); font-family:'DM Mono',monospace;
+    font-size:11px; font-weight:500; padding:5px 14px; border-radius:100px;
+    margin-bottom:22px; letter-spacing:.04em;
+  }
+
+  .pill-dot { width:6px; height:6px; background:var(--glow); border-radius:50%; animation:blink 2s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  h1 {
+    font-family:'Syne',sans-serif; font-weight:800;
+    font-size:60px; line-height:1.0; color:var(--deep);
+    letter-spacing:-.03em; margin-bottom:22px;
+  }
+
+  h1 .accent { color:var(--moss); font-family:'Lora',serif; font-style:italic; font-weight:600; }
+
+  .hero-p {
+    font-size:16px; line-height:1.7; color:var(--text2);
+    margin-bottom:34px; max-width:460px; font-weight:400;
+  }
+
+  .hero-actions { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:44px; }
+
+  .hero-proof {
+    display:flex; gap:28px; padding-top:24px;
+    border-top:1px solid var(--border);
+  }
+
+  .proof-item { display:flex; flex-direction:column; }
+  .proof-num { font-family:'Syne',sans-serif; font-weight:800; font-size:26px; color:var(--deep); letter-spacing:-.02em; }
+  .proof-lbl { font-family:'DM Mono',monospace; font-size:10px; color:var(--text3); letter-spacing:.06em; text-transform:uppercase; margin-top:2px; }
+
+  .phone-scene {
+    position:relative; display:flex; justify-content:center; align-items:center; padding:20px 0;
+  }
+
+  .phone-body {
+    width:220px;
+    background:var(--deep);
+    border-radius:32px;
+    border:8px solid #0d1a0a;
+    box-shadow:0 40px 80px rgba(26,36,21,0.35), 0 0 0 1px rgba(255,255,255,0.06);
+    overflow:hidden;
+    animation:hover 7s ease-in-out infinite;
+  }
+
+  @keyframes hover { 0%,100%{transform:translateY(0) rotate(-.5deg)} 50%{transform:translateY(-10px) rotate(.5deg)} }
+
+  .phone-notch {
+    height:28px; background:#0d1a0a;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:0 0 14px 14px; margin:0 auto; width:80px; position:relative; z-index:2;
+    margin-top:-1px;
+  }
+
+  .phone-screen {
+    background:linear-gradient(160deg, #0b1f0a 0%, #122808 100%);
+    min-height:380px;
+    padding:12px;
+    position:relative; overflow:hidden;
+  }
+
+  .cam-overlay {
+    position:absolute; inset:0;
+    background-image:
+      linear-gradient(rgba(109,222,74,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(109,222,74,0.04) 1px, transparent 1px);
+    background-size:18px 18px;
+  }
+
+  .scan-sweep {
+    position:absolute; width:100%; height:2px;
+    background:linear-gradient(90deg, transparent, var(--glow), transparent);
+    animation:sweep 2.8s ease-in-out infinite; opacity:.9;
+  }
+  @keyframes sweep { 0%{top:8%} 100%{top:92%} }
+
+  .corner { position:absolute; width:14px; height:14px; border-color:var(--glow); border-style:solid; opacity:.7; }
+  .corner.tl { top:10px; left:10px; border-width:2px 0 0 2px; }
+  .corner.tr { top:10px; right:10px; border-width:2px 2px 0 0; }
+  .corner.bl { bottom:10px; left:10px; border-width:0 0 2px 2px; }
+  .corner.br { bottom:10px; right:10px; border-width:0 2px 2px 0; }
+
+  .phone-status {
+    display:flex; justify-content:space-between; align-items:center;
+    margin-bottom:10px; position:relative; z-index:2;
+  }
+  .ps-label { font-family:'DM Mono',monospace; font-size:9px; color:rgba(109,222,74,.7); letter-spacing:.08em; }
+  .ps-live { display:flex; align-items:center; gap:4px; font-family:'DM Mono',monospace; font-size:9px; color:var(--glow); }
+  .ps-dot { width:5px; height:5px; background:var(--glow); border-radius:50%; animation:blink 1.5s infinite; }
+
+  .detect-box {
+    position:absolute; border:1.5px solid var(--glow); border-radius:4px; opacity:.8;
+    animation:pulse-box 2s ease-in-out infinite;
+  }
+  @keyframes pulse-box { 0%,100%{opacity:.8} 50%{opacity:.4} }
+
+  .db1 { top:25%; left:18%; width:50px; height:60px; }
+  .db2 { top:35%; right:14%; width:55px; height:42px; }
+  .db3 { bottom:28%; left:28%; width:48px; height:55px; }
+
+  .detect-label {
+    position:absolute; font-family:'DM Mono',monospace; font-size:7px;
+    color:var(--glow); background:rgba(13,26,10,.7); padding:1px 4px; border-radius:2px;
+    white-space:nowrap;
+  }
+  .dl1 { top:calc(25% - 12px); left:18%; }
+  .dl2 { top:calc(35% - 12px); right:14%; }
+  .dl3 { bottom:calc(28% - 16px); left:28%; }
+
+  .motion-alert {
+    position:absolute; bottom:14px; left:10px; right:10px; z-index:3;
+    background:rgba(109,222,74,.15); border:1px solid rgba(109,222,74,.4);
+    border-radius:8px; padding:8px 10px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .ma-icon { font-size:14px; }
+  .ma-text { font-family:'DM Mono',monospace; font-size:9px; color:var(--glow); line-height:1.5; }
+
+  .chip {
+    position:absolute; background:white; border:1px solid var(--border);
+    border-radius:12px; padding:10px 14px;
+    box-shadow:0 10px 28px rgba(26,36,21,.12);
+    font-size:12px; white-space:nowrap;
+    animation:hover 6s ease-in-out infinite;
+  }
+
+  .chip-1 { right:-80px; top:50px; animation-delay:.4s; }
+  .chip-2 { left:-90px; bottom:90px; animation-delay:.9s; }
+
+  .chip-lbl { font-family:'DM Mono',monospace; font-size:9px; color:var(--text3); text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px; }
+  .chip-val { font-family:'Syne',sans-serif; font-weight:700; font-size:18px; color:var(--deep); }
+  .chip-sub { font-size:10px; color:var(--text3); margin-top:1px; }
+
+  .section { max-width:1200px; margin:0 auto; padding:80px 52px; }
+
+  .eyebrow {
+    font-family:'DM Mono',monospace; font-size:11px; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--sage); margin-bottom:10px;
+  }
+
+  h2 {
+    font-family:'Syne',sans-serif; font-weight:800; font-size:42px;
+    letter-spacing:-.025em; color:var(--deep); line-height:1.1; margin-bottom:48px;
+  }
+  h2 em { font-family:'Lora',serif; font-style:italic; font-weight:600; color:var(--moss); }
+
+  .steps { display:grid; grid-template-columns:repeat(3,1fr); gap:2px; }
+
+  .step {
+    background:var(--card); border:1px solid var(--border);
+    padding:30px 26px; position:relative;
+    transition:transform .25s, box-shadow .25s;
+  }
+  .step:first-child { border-radius:var(--r-lg) 0 0 var(--r-lg); }
+  .step:last-child { border-radius:0 var(--r-lg) var(--r-lg) 0; }
+  .step:hover { transform:translateY(-4px); box-shadow:0 16px 40px rgba(26,36,21,.1); z-index:1; }
+
+  .step-n {
+    font-family:'DM Mono',monospace; font-size:10px; color:var(--sage);
+    letter-spacing:.08em; margin-bottom:14px;
+  }
+
+  .step-ico {
+    width:48px; height:48px; border-radius:14px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:22px; margin-bottom:16px;
+  }
+
+  .step-h { font-size:17px; font-weight:700; color:var(--deep); margin-bottom:8px; }
+  .step-p { font-size:13px; line-height:1.65; color:var(--text2); font-weight:400; }
+
+  .step-tag {
+    display:inline-block; margin-top:14px;
+    font-family:'DM Mono',monospace; font-size:10px;
+    background:var(--bg2); color:var(--moss); padding:3px 10px;
+    border-radius:100px; border:1px solid rgba(42,74,32,.12);
+  }
+
+  .demo-section { background:var(--bg2); padding:80px 0; }
+  .demo-inner { max-width:1200px; margin:0 auto; padding:0 52px; }
+
+  .app-window {
+    background:white; border-radius:20px;
+    border:1px solid var(--border);
+    box-shadow:0 40px 80px rgba(26,36,21,.1);
+    overflow:hidden; margin-top:40px;
+  }
+
+  .win-chrome {
+    background:var(--deep); padding:0;
+    display:flex; align-items:stretch;
+  }
+
+  .win-tab {
+    padding:14px 22px; font-family:'DM Mono',monospace;
+    font-size:12px; color:rgba(255,255,255,.45);
+    cursor:pointer; border-bottom:2px solid transparent;
+    transition:all .2s; border:none; background:transparent;
+    letter-spacing:.03em;
+  }
+
+  .win-tab.active {
+    color:white; border-bottom:2px solid var(--glow);
+    background:rgba(255,255,255,.04);
+  }
+
+  .win-right {
+    margin-left:auto; display:flex; align-items:center;
+    padding:0 20px; gap:10px;
+  }
+
+  .win-status {
+    display:flex; align-items:center; gap:5px;
+    font-family:'DM Mono',monospace; font-size:10px;
+    color:var(--glow);
+  }
+
+  .app-layout {
+    display:grid; grid-template-columns:220px 1fr;
+    min-height:520px;
+  }
+
+  .sidebar {
+    background:var(--bg); border-right:1px solid var(--border);
+    padding:18px 14px;
+  }
+
+  .sb-section {
+    font-family:'DM Mono',monospace; font-size:9px;
+    text-transform:uppercase; letter-spacing:.1em;
+    color:var(--text3); padding:0 8px; margin-bottom:6px; margin-top:14px;
+  }
+
+  .sb-item {
+    display:flex; align-items:center; gap:9px;
+    padding:8px 10px; border-radius:10px; cursor:pointer;
+    font-size:13px; font-weight:500; color:var(--text2);
+    margin-bottom:2px; transition:background .15s;
+  }
+  .sb-item:hover { background:var(--bg2); }
+  .sb-item.active { background:white; color:var(--deep); box-shadow:0 1px 4px rgba(26,36,21,.07); }
+  .sb-item .icon { font-size:15px; }
+  .sb-badge {
+    margin-left:auto; background:var(--warm);
+    color:white; font-family:'DM Mono',monospace;
+    font-size:9px; padding:1px 6px; border-radius:100px;
+  }
+  .sb-badge.green { background:var(--moss); }
+
+  .main { padding:22px; }
+
+  .main-top {
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;
+  }
+
+  .main-title { font-size:20px; font-weight:800; color:var(--deep); letter-spacing:-.02em; }
+
+  .scan-status {
+    display:flex; align-items:center; gap:5px;
+    font-family:'DM Mono',monospace; font-size:10px; color:var(--sage);
+  }
+
+  .metrics {
+    display:grid; grid-template-columns:repeat(4,1fr);
+    gap:10px; margin-bottom:18px;
+  }
+
+  .met {
+    background:var(--bg); border:1px solid var(--border);
+    border-radius:10px; padding:12px 14px;
+  }
+
+  .met-l {
+    font-family:'DM Mono',monospace; font-size:9px;
+    text-transform:uppercase; letter-spacing:.06em;
+    color:var(--text3); margin-bottom:5px;
+  }
+
+  .met-v { font-family:'Syne',sans-serif; font-weight:800; font-size:24px; color:var(--deep); letter-spacing:-.02em; }
+  .met-s { font-size:10px; color:var(--text3); margin-top:1px; font-weight:400; }
+
+  .content-cols { display:grid; grid-template-columns:1fr 260px; gap:14px; }
+
+  .inv-table {
+    background:var(--bg); border:1px solid var(--border);
+    border-radius:12px; overflow:hidden;
+  }
+
+  .t-head {
+    display:grid; grid-template-columns:2fr 1fr 1.2fr 1fr 0.8fr;
+    padding:9px 14px; background:var(--bg2);
+    border-bottom:1px solid var(--border);
+  }
+
+  .th { font-family:'DM Mono',monospace; font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--text3); }
+
+  .t-row {
+    display:grid; grid-template-columns:2fr 1fr 1.2fr 1fr 0.8fr;
+    padding:9px 14px; border-bottom:1px solid var(--border);
+    align-items:center; cursor:pointer; transition:background .15s;
+  }
+  .t-row:last-child { border-bottom:none; }
+  .t-row:hover { background:white; }
+
+  .r-name { display:flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:var(--text); }
+  .r-em { font-size:15px; }
+  .r-c { font-family:'DM Mono',monospace; font-size:11px; color:var(--text2); }
+
+  .bar { height:4px; background:var(--bg2); border-radius:10px; overflow:hidden; width:56px; }
+  .bar-f { height:100%; border-radius:10px; transition:width .4s; }
+
+  .badge {
+    display:inline-block; font-family:'DM Mono',monospace; font-size:9px;
+    padding:2px 7px; border-radius:100px; font-weight:500;
+  }
+  .b-ok { background:rgba(74,122,50,.1); color:var(--moss); }
+  .b-low { background:rgba(232,98,42,.12); color:#c44a1a; }
+  .b-warn { background:rgba(212,160,23,.12); color:#8a6800; }
+  .b-cart { background:rgba(58,143,212,.12); color:#1a5fa8; }
+
+  .cart {
+    background:var(--bg); border:1px solid var(--border);
+    border-radius:12px; padding:14px;
+    display:flex; flex-direction:column; gap:10px;
+  }
+
+  .cart-top { display:flex; align-items:center; justify-content:space-between; }
+  .cart-ttl { font-size:15px; font-weight:700; color:var(--deep); }
+  .cart-cnt { background:var(--warm); color:white; font-family:'DM Mono',monospace; font-size:10px; padding:2px 8px; border-radius:100px; }
+
+  .cart-item {
+    display:flex; align-items:center; gap:9px;
+    padding:9px 10px; background:white;
+    border:1px solid var(--border); border-radius:9px; font-size:12px;
+    transition:transform .15s;
+  }
+  .cart-item:hover { transform:translateX(2px); }
+
+  .ci-em { font-size:15px; }
+  .ci-info { flex:1; }
+  .ci-name { font-weight:600; font-size:11px; color:var(--text); }
+  .ci-why { font-family:'DM Mono',monospace; font-size:9px; color:var(--text3); margin-top:1px; }
+
+  .order-btn {
+    width:100%; padding:11px; background:var(--deep);
+    color:white; border:none; border-radius:9px;
+    font-family:'Syne',sans-serif; font-size:12px; font-weight:700;
+    cursor:pointer; transition:background .2s; letter-spacing:.01em;
+    text-align: center; text-decoration: none; display: block;
+  }
+  .order-btn:hover { background:var(--forest); }
+
+  .auto-label {
+    text-align:center; font-family:'DM Mono',monospace;
+    font-size:9px; color:var(--sage); letter-spacing:.05em;
+  }
+
+  .rufus-box {
+    background: var(--deep);
+    border-radius: 10px;
+    padding: 14px;
+    margin-top: 5px;
+    border: 1px solid rgba(109,222,74,0.2);
+  }
+  .rufus-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--glow);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  #rufus-text {
+    color: #fff;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    opacity: 0.85;
+    margin-bottom: 12px;
+  }
+
+  footer {
+    background:var(--deep); color:rgba(255,255,255,.4);
+    padding:40px 52px; display:flex;
+    align-items:center; justify-content:space-between; font-size:13px;
+  }
+  .foot-logo { font-family:'Syne',sans-serif; font-weight:800; color:white; font-size:18px; letter-spacing:-.02em; }
+  .foot-links { display:flex; gap:22px; }
+  .foot-links a { color:rgba(255,255,255,.4); text-decoration:none; font-size:12px; transition:color .2s; font-weight:400; }
+  .foot-links a:hover { color:white; }
+  .foot-badge { font-family:'DM Mono',monospace; font-size:10px; color:var(--glow); letter-spacing:.04em; }
+
+  @media(max-width:900px){
+    nav { padding:14px 20px; }
+    nav ul { display:none; }
+    .hero { grid-template-columns:1fr; padding:40px 20px; gap:40px; }
+    h1 { font-size:38px; }
+    .chip-1,.chip-2 { display:none; }
+    .section { padding:48px 20px; }
+    h2 { font-size:30px; }
+    .steps { grid-template-columns:1fr; }
+    .step:first-child,.step:last-child { border-radius:var(--r-lg); }
+    footer { flex-direction:column; gap:20px; padding:32px 20px; text-align:center; }
+  }
+
+  @keyframes met-pulse { 0%{transform:scale(1)} 30%{transform:scale(1.18);color:var(--glow)} 100%{transform:scale(1)} }
+  .met-v.pulse { animation:met-pulse 0.45s ease-out; }
+  .cam-live { display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:10px;padding:4px 10px;border-radius:100px;border:1px solid rgba(109,222,74,0.3);background:rgba(109,222,74,0.08);color:var(--sage);transition:all 0.4s; }
+  .cam-live.online { color:var(--glow);border-color:rgba(109,222,74,0.6);background:rgba(109,222,74,0.14); }
+  .cam-live.offline { color:#c44a1a;border-color:rgba(232,98,42,0.4);background:rgba(232,98,42,0.08); }
+  .cam-live-dot { width:6px;height:6px;border-radius:50%;background:var(--sage);transition:background 0.4s; }
+  .cam-live.online .cam-live-dot { background:var(--glow);animation:blink 1.2s ease-in-out infinite; }
+  .cam-live.offline .cam-live-dot { background:#c44a1a;animation:none; }
+  .event-feed { background:var(--bg);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column; }
+  .feed-header { display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--bg2);border-bottom:1px solid var(--border); }
+  .feed-title { font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3); }
+  .feed-clear { font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);cursor:pointer;background:none;border:none;padding:0;transition:color .15s; }
+  .feed-clear:hover { color:var(--warm); }
+  .feed-list { flex:1;overflow-y:auto;max-height:220px; }
+  .feed-empty { padding:20px 14px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);text-align:center; }
+  .feed-item { display:flex;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid var(--border);animation:feed-in 0.3s ease-out; }
+  .feed-item:last-child { border-bottom:none; }
+  @keyframes feed-in { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:translateX(0)} }
+  .feed-dot { width:7px;height:7px;border-radius:50%;flex-shrink:0; }
+  .feed-dot.add { background:var(--glow); }
+  .feed-dot.remove { background:var(--warm); }
+  .feed-text { flex:1;font-family:'DM Mono',monospace;font-size:10px;color:var(--text2); }
+  .feed-text strong { color:var(--text); }
+  .feed-age { font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);white-space:nowrap; }
+  .ai-panel { background:var(--deep);border-radius:12px;border:1px solid rgba(109,222,74,0.2);overflow:hidden; }
+  .ai-panel-header { display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(109,222,74,0.15); }
+  .ai-panel-title { font-family:'DM Mono',monospace;font-size:10px;color:var(--glow);text-transform:uppercase;letter-spacing:.08em; }
+  .ai-refresh-btn { font-family:'DM Mono',monospace;font-size:9px;color:rgba(109,222,74,.6);background:none;border:1px solid rgba(109,222,74,.25);border-radius:100px;padding:2px 10px;cursor:pointer;transition:all .2s; }
+  .ai-refresh-btn:hover { color:var(--glow);border-color:var(--glow); }
+  .ai-refresh-btn:disabled { opacity:.4;cursor:default; }
+  .ai-body { padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-height:60px; }
+  .ai-loading { font-family:'DM Mono',monospace;font-size:10px;color:rgba(109,222,74,.5);text-align:center;padding:10px 0; }
+  .recipe-card { background:rgba(255,255,255,.04);border:1px solid rgba(109,222,74,.12);border-radius:8px;padding:10px 12px; }
+  .recipe-name { font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:white;margin-bottom:3px; }
+  .recipe-desc { font-family:'DM Mono',monospace;font-size:10px;color:rgba(255,255,255,.55);line-height:1.5;margin-bottom:5px; }
+  .recipe-uses { display:flex;flex-wrap:wrap;gap:4px; }
+  .recipe-tag { font-family:'DM Mono',monospace;font-size:9px;background:rgba(109,222,74,.12);color:var(--glow);padding:1px 7px;border-radius:100px; }
+  .siri-check { background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px; }
+  .siri-check-title { font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3); }
+  .siri-input-row { display:flex;gap:6px; }
+  .siri-input { flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:white;font-family:'DM Mono',monospace;font-size:11px;color:var(--text);outline:none;transition:border-color .2s; }
+  .siri-input:focus { border-color:var(--sage); }
+  .siri-ask-btn { padding:7px 14px;background:var(--deep);color:white;border:none;border-radius:8px;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:background .2s;white-space:nowrap; }
+  .siri-ask-btn:hover { background:var(--forest); }
+  .siri-ask-btn:disabled { opacity:.5;cursor:default; }
+  .siri-reply { font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);line-height:1.6;padding:8px 10px;background:var(--bg2);border-radius:8px;display:none; }
+  .siri-reply.visible { display:block; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#" class="logo">
+    <div class="logo-mark">📦</div>
+    InvenTrack
+  </a>
+  <ul>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#tech">Stack</a></li>
+    <li><a href="#demo">Demo</a></li>
+  </ul>
+  <div class="nav-right">
+    <a href="#demo" class="btn btn-outline">Live demo</a>
+    <a href="https://github.com" target="_blank" class="btn btn-solid">GitHub →</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div>
+    <div class="hero-pill"><div class="pill-dot"></div> Hackathon 2026 · AI Vision · Rufus Agent</div>
+    <h1>Your fridge, <span class="accent">always</span> accounted for</h1>
+    <p class="hero-p">InvenTrack mounts your phone inside the fridge. It identifies low stock using AI vision and generates ready-to-use Amazon Rufus prompts for instant restocking.</p>
+    <div class="hero-actions">
+      <a href="#demo" class="btn btn-green">See app demo</a>
+      <a href="#how" class="btn btn-outline">How it works</a>
+    </div>
+    <div class="hero-proof">
+      <div class="proof-item"><span class="proof-num">Auto</span><span class="proof-lbl">Scan trigger</span></div>
+      <div class="proof-item"><span class="proof-num">GPT-4o</span><span class="proof-lbl">Vision Processing</span></div>
+      <div class="proof-item"><span class="proof-num">Rufus</span><span class="proof-lbl">Prompt Generator</span></div>
+    </div>
+  </div>
+
+  <div class="phone-scene">
+    <div class="chip chip-1">
+      <div class="chip-lbl">Detected</div>
+      <div class="chip-val">12</div>
+      <div class="chip-sub">items in fridge</div>
+    </div>
+
+    <div class="phone-body">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="cam-overlay"></div>
+        <div class="scan-sweep"></div>
+        <div class="corner tl"></div>
+        <div class="corner tr"></div>
+        <div class="corner bl"></div>
+        <div class="corner br"></div>
+
+        <div class="phone-status">
+          <span class="ps-label">INVENTRACK CAM</span>
+          <div class="ps-live"><div class="ps-dot"></div>ACTIVE</div>
+        </div>
+
+        <div class="detect-box db1"></div>
+        <div class="detect-box db2"></div>
+        <div class="detect-box db3"></div>
+        <div class="detect-label dl1">Milk · LOW</div>
+        <div class="detect-label dl2">Eggs · OK</div>
+        <div class="detect-label dl3">Yogurt · OK</div>
+
+        <div class="motion-alert">
+          <span class="ma-icon">⚡</span>
+          <div class="ma-text">
+            MOTION DETECTED<br>
+            Capturing image → sending to Mac
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chip chip-2">
+      <div class="chip-lbl">Cart added</div>
+      <div class="chip-val">3</div>
+      <div class="chip-sub">items for Rufus</div>
+    </div>
+  </div>
+</div>
+
+<section class="section" id="how">
+  <div class="eyebrow">How it works</div>
+  <h2>Phone sees it.<br>Mac processes it.<br><em>Rufus orders it.</em></h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-n">STEP 01</div>
+      <div class="step-ico" style="background:rgba(109,222,74,0.1)">📱</div>
+      <div class="step-h">Phone detects motion</div>
+      <p class="step-p">The phone detects pixel changes when the door opens, triggering a high-res capture sent to the FastAPI backend.</p>
+    </div>
+    <div class="step">
+      <div class="step-n">STEP 02</div>
+      <div class="step-ico" style="background:rgba(74,122,50,0.1)">🧠</div>
+      <div class="step-h">Mac runs Vision AI</div>
+      <p class="step-p">GPT-4o Vision parses the image into structured JSON and creates a natural language prompt for Amazon's Rufus AI.</p>
+    </div>
+    <div class="step">
+      <div class="step-n">STEP 03</div>
+      <div class="step-ico" style="background:rgba(58,143,212,0.1)">🛒</div>
+      <div class="step-h">Instant Restock</div>
+      <p class="step-p">Copy the auto-generated command and paste it directly into Rufus on Amazon for agentic brand selection and checkout.</p>
+    </div>
+  </div>
+</section>
+
+<div class="demo-section" id="demo">
+  <div class="demo-inner">
+    <div class="eyebrow">App demo</div>
+    <h2>The <em>InvenTrack</em> dashboard</h2>
+
+    <div class="app-window">
+      <div class="win-chrome">
+        <button class="win-tab active">📦 Inventory</button>
+        <button class="win-tab">🍳 Recipes</button>
+        <button class="win-tab">⚙️ Settings</button>
+        <div class="win-right">
+          <div class="win-status"><div class="pill-dot"></div> Server active · localhost:8001</div>
+        </div>
+      </div>
+
+      <div class="app-layout">
+        <div class="sidebar">
+          <div class="sb-section">Fridge</div>
+          <div class="sb-item active" id="all-items-btn"><span class="icon">🥗</span><span>All items</span></div>
+          <div class="sb-item" id="low-stock-btn"><span class="icon">🔴</span><span>Low stock</span><span class="sb-badge">0</span></div>
+          <div class="sb-section">Shopping</div>
+          <div class="sb-item"><span class="icon">🛒</span><span>Cart</span><span class="sb-badge" id="sidebar-cart-badge">0</span></div>
+          <div class="sb-section">AI Agents</div>
+          <div class="sb-item" id="tech-btn"><span class="icon">🤖</span><span>Rufus Bridge</span><span class="sb-badge green">ONLINE</span></div>
+        </div>
+
+        <div class="main">
+          <div class="main-top">
+            <div class="main-title">Inventory Overview</div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="cam-live offline" id="cam-indicator"><div class="cam-live-dot"></div><span id="cam-label">CAM OFFLINE</span></div>
+              <div class="scan-status" id="scan-status"><div class="pill-dot" style="background:var(--sage)"></div>Waiting for camera…</div>
+            </div>
+          </div>
+
+          <div class="metrics">
+            <div class="met"><div class="met-l">Items Detected</div><div class="met-v">0</div></div>
+            <div class="met"><div class="met-l">Low Stock</div><div class="met-v" style="color:var(--warm)">0</div></div>
+            <div class="met"><div class="met-l">Expiring</div><div class="met-v" style="color:#c44a1a">0</div></div>
+            <div class="met"><div class="met-l">Cart Items</div><div class="met-v" style="color:var(--sky)">0</div></div>
+          </div>
+
+          <div class="content-cols">
+            <div style="display:flex;flex-direction:column;gap:14px;">
+
+              <div class="inv-table" id="inventory-table">
+                <div class="t-head">
+                  <div class="th">Item</div>
+                  <div class="th">Qty</div>
+                  <div class="th">Level</div>
+                  <div class="th">Status</div>
+                </div>
+                <div id="table-empty" style="padding:20px 14px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);text-align:center;">Waiting for camera to detect items…</div>
+              </div>
+
+              <div class="event-feed">
+                <div class="feed-header">
+                  <span class="feed-title">⚡ Live Event Feed</span>
+                  <button class="feed-clear" onclick="clearFeed()">clear</button>
+                </div>
+                <div class="feed-list" id="feed-list">
+                  <div class="feed-empty" id="feed-empty">Waiting for camera events…</div>
+                </div>
+              </div>
+
+              <div class="siri-check">
+                <div class="siri-check-title">🍽️ Ask AI — do I have ingredients for…</div>
+                <div class="siri-input-row">
+                  <input class="siri-input" id="dish-input" type="text" placeholder="e.g. pasta, omelette, stir fry…" />
+                  <button class="siri-ask-btn" id="dish-btn" onclick="checkDish()">Ask AI</button>
+                </div>
+                <div class="siri-reply" id="siri-reply"></div>
+              </div>
+
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:14px;">
+
+              <div class="cart">
+                <div class="cart-top">
+                  <div class="cart-ttl">Amazon Cart</div>
+                  <div class="cart-cnt" id="cart-count">0 items</div>
+                </div>
+                <div class="rufus-box">
+                  <div class="rufus-title">🤖 Rufus Prompt</div>
+                  <p id="rufus-text">Waiting for low stock items to appear…</p>
+                  <button onclick="copyPrompt()" id="copy-btn" class="btn btn-green" style="width:100%;padding:8px;font-size:11px;margin-top:5px;">Copy Prompt 📋</button>
+                </div>
+                <a href="https://www.amazon.com/" target="_blank" class="order-btn">Open Amazon →</a>
+                <div class="auto-label" style="margin-top:10px;" id="cart-items-label"></div>
+                <div id="cart-items-list"></div>
+              </div>
+
+              <div class="ai-panel">
+                <div class="ai-panel-header">
+                  <span class="ai-panel-title">✨ AI Recipe Suggestions</span>
+                  <button class="ai-refresh-btn" id="recipe-btn" onclick="loadRecipes()">Suggest</button>
+                </div>
+                <div class="ai-body" id="recipe-body">
+                  <div class="ai-loading">Click "Suggest" to get recipe ideas from your fridge</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="foot-logo">📦 InvenTrack</div>
+  <div class="foot-links">
+    <a href="#">GitHub</a>
+    <a href="#">Setup guide</a>
+    <a href="#">Team</a>
+  </div>
+  <div class="foot-badge">⚡ Built at hackathon 2026</div>
+</footer>
+
+<script>
+// ── AI recipe suggestions ─────────────────────────────────────────────────────
+async function loadRecipes() {
+  const btn = document.getElementById('recipe-btn');
+  const body = document.getElementById('recipe-body');
+  btn.disabled = true; btn.textContent = 'Thinking…';
+  body.innerHTML = '<div class="ai-loading">🤖 Asking AI…</div>';
+  try {
+    const res = await fetch('/ai/recipes');
+    const data = await res.json();
+    const recipes = data.recipes;
+    if (!recipes || recipes.length === 0) { body.innerHTML = '<div class="ai-loading">Add some items to your fridge first!</div>'; return; }
+    body.innerHTML = '';
+    recipes.forEach(r => {
+      const uses = Array.isArray(r.uses) ? r.uses : (r.uses||'').split(',');
+      const card = document.createElement('div'); card.className = 'recipe-card';
+      card.innerHTML = `<div class="recipe-name">${r.name}</div><div class="recipe-desc">${r.description}</div><div class="recipe-uses">${uses.map(u=>`<span class="recipe-tag">${u.toString().trim()}</span>`).join('')}</div>`;
+      body.appendChild(card);
+    });
+  } catch(e) { body.innerHTML = '<div class="ai-loading" style="color:#c44a1a">Error reaching AI.</div>'; }
+  finally { btn.disabled = false; btn.textContent = 'Refresh'; }
+}
+
+async function checkDish() {
+  const input = document.getElementById('dish-input');
+  const btn = document.getElementById('dish-btn');
+  const reply = document.getElementById('siri-reply');
+  const dish = input.value.trim(); if (!dish) return;
+  btn.disabled = true; btn.textContent = '…';
+  reply.className = 'siri-reply visible'; reply.textContent = '🤖 Checking your fridge…';
+  try {
+    const res = await fetch(`/siri/recipe-check?dish=${encodeURIComponent(dish)}`);
+    const data = await res.json(); reply.textContent = data.reply;
+  } catch(e) { reply.textContent = 'Could not reach AI.'; }
+  finally { btn.disabled = false; btn.textContent = 'Ask AI'; }
+}
+
+// ── emoji map ─────────────────────────────────────────────────────────────────
+const EMOJI = { coke_can:'🥤', lemon:'🍋', doritos:'🌽', red_bull:'⚡', water_bottle:'💧', bottle:'🍶', 'wine glass':'🍷', cup:'☕', banana:'🍌', apple:'🍎', sandwich:'🥪', orange:'🍊', broccoli:'🥦', carrot:'🥕', 'hot dog':'🌭', pizza:'🍕', donut:'🍩', cake:'🎂' };
+function emojiFor(name) { return EMOJI[name.toLowerCase()] || '📦'; }
+function badgeClass(s) { return {Good:'b-ok',Medium:'b-warn',Low:'b-low',Empty:'b-low'}[s]||'b-ok'; }
+function barWidth(s) { return {Good:'85%',Medium:'45%',Low:'15%',Empty:'4%'}[s]||'85%'; }
+function barColor(s) { return {Good:'#4a7a32',Medium:'#d4a017',Low:'#e8622a',Empty:'#c44a1a'}[s]||'#4a7a32'; }
+
+// ── metric pulse ──────────────────────────────────────────────────────────────
+function pulseMetric(el) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); el.addEventListener('animationend',()=>el.classList.remove('pulse'),{once:true}); }
+
+// ── camera live indicator ─────────────────────────────────────────────────────
+let camOnlineTimer = null;
+function setCamOnline() {
+  const ind = document.getElementById('cam-indicator'); const lbl = document.getElementById('cam-label'); if (!ind) return;
+  ind.className = 'cam-live online'; lbl.textContent = 'CAM LIVE';
+  clearTimeout(camOnlineTimer);
+  camOnlineTimer = setTimeout(() => { ind.className = 'cam-live offline'; lbl.textContent = 'CAM OFFLINE'; }, 10000);
+}
+
+// ── event feed ────────────────────────────────────────────────────────────────
+const feedEvents = [];
+function relativeTime(ts) { const s=Math.floor((Date.now()-ts)/1000); if(s<5)return'just now'; if(s<60)return`${s}s ago`; return`${Math.floor(s/60)}m ago`; }
+function addFeedEvent(event, item) { feedEvents.unshift({event,item,ts:Date.now()}); if(feedEvents.length>30)feedEvents.pop(); renderFeed(); setCamOnline(); }
+function renderFeed() {
+  const list = document.getElementById('feed-list'); const empty = document.getElementById('feed-empty'); if(!list)return;
+  if(feedEvents.length===0){if(empty)empty.style.display='block';return;}
+  if(empty)empty.style.display='none';
+  const firstEl=list.querySelector('.feed-item'); const firstKey=firstEl?firstEl.dataset.key:null;
+  const newKey=`${feedEvents[0].event}-${feedEvents[0].item}-${feedEvents[0].ts}`;
+  if(firstKey===newKey)return;
+  list.innerHTML='';
+  feedEvents.forEach(ev=>{
+    const div=document.createElement('div'); div.className='feed-item'; div.dataset.key=`${ev.event}-${ev.item}-${ev.ts}`;
+    const isAdd=ev.event==='ADD';
+    div.innerHTML=`<div class="feed-dot ${isAdd?'add':'remove'}"></div><div class="feed-text"><strong>${isAdd?'＋ ADD':'－ REMOVE'}</strong> · ${ev.item}</div><div class="feed-age">${relativeTime(ev.ts)}</div>`;
+    list.appendChild(div);
+  });
+}
+window.clearFeed=function(){feedEvents.length=0;const list=document.getElementById('feed-list');if(list)list.innerHTML='';const empty=document.getElementById('feed-empty');if(empty){empty.style.display='block';list&&list.appendChild(empty);}};
+setInterval(renderFeed,5000);
+
+// ── render inventory ──────────────────────────────────────────────────────────
+function renderInventory(inventory) {
+  const table = document.getElementById('inventory-table');
+  const header = table.querySelector('.t-head'); table.innerHTML=''; table.appendChild(header);
+  const emptyMsg=document.getElementById("table-empty"); if(emptyMsg)emptyMsg.style.display=Object.keys(inventory).length===0?"block":"none";
+  const entries = Object.entries(inventory);
+  entries.forEach(([name,data])=>{
+    const row=document.createElement('div'); row.className='t-row';
+    row.innerHTML=`<div class="r-name"><span class="r-em">${emojiFor(name)}</span>${name.charAt(0).toUpperCase()+name.slice(1)}</div><div class="r-c">${data.count} unit${data.count!==1?'s':''}</div><div class="r-c"><div class="bar"><div class="bar-f" style="width:${barWidth(data.status)};background:${barColor(data.status)}"></div></div></div><div><span class="badge ${badgeClass(data.status)}">${data.status}</span></div>`;
+    table.appendChild(row);
+  });
+  const metEls=document.querySelectorAll('.met-v');
+  const total=entries.length; const lowCount=entries.filter(([,v])=>v.status==='Low'||v.status==='Empty').length;
+  if(metEls[0]&&metEls[0].textContent!==String(total)){metEls[0].textContent=total;pulseMetric(metEls[0]);}
+  if(metEls[1]&&metEls[1].textContent!==String(lowCount)){metEls[1].textContent=lowCount;pulseMetric(metEls[1]);}
+  const badge=document.querySelector('#low-stock-btn .sb-badge'); if(badge)badge.textContent=lowCount;
+  const lowItems=entries.filter(([,v])=>v.status==='Low'||v.status==='Empty').map(([n])=>n.charAt(0).toUpperCase()+n.slice(1));
+  if(lowItems.length>0){
+    document.getElementById('rufus-text').textContent=`Hey Rufus, please add ${lowItems.join(', ')} to my cart. Pick the best-rated Prime options.`;
+    document.getElementById('cart-count').textContent=`${lowItems.length} item${lowItems.length!==1?'s':''}`;
+    document.getElementById('sidebar-cart-badge').textContent=lowItems.length;
+    if(metEls[3]&&metEls[3].textContent!==String(lowItems.length)){metEls[3].textContent=lowItems.length;pulseMetric(metEls[3]);}
+  } else {
+    document.getElementById('rufus-text').textContent='Your fridge is fully stocked! Nothing to reorder right now.';
+    document.getElementById('cart-count').textContent='0 items';
+    document.getElementById('sidebar-cart-badge').textContent='0';
+  }
+  // update cart items list dynamically
+  const cartList = document.getElementById('cart-items-list');
+  const cartLabel = document.getElementById('cart-items-label');
+  if(cartList) {
+    cartList.innerHTML='';
+    if(lowItems.length>0){
+      if(cartLabel)cartLabel.textContent='Queue Details:';
+      lowItems.forEach(name=>{
+        const item=document.createElement('div'); item.className='cart-item';
+        item.innerHTML=`<span class="ci-em">${emojiFor(name.toLowerCase())}</span><div class="ci-info"><div class="ci-name">${name}</div><div class="ci-why">Low stock</div></div>`;
+        cartList.appendChild(item);
+      });
+    } else {
+      if(cartLabel)cartLabel.textContent='';
+    }
+  }
+  applyFilter();
+}
+
+let activeFilter='all';
+function applyFilter(){
+  const rows=document.querySelectorAll('.t-row'); const mainTitle=document.querySelector('.main-title');
+  rows.forEach(row=>{
+    const badge=row.querySelector('.badge'); if(!badge)return; const status=badge.textContent.toLowerCase();
+    if(activeFilter==='all'){row.style.display='grid';if(mainTitle)mainTitle.textContent='Inventory Overview';}
+    else if(activeFilter==='low'){row.style.display=(status==='low'||status==='empty')?'grid':'none';if(mainTitle)mainTitle.textContent='Priority Restock: Low Items';}
+  });
+}
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+function connectWS(){
+  const ws=new WebSocket(`ws://${location.host}/ws`);
+  ws.onmessage=(e)=>{
+    const msg=JSON.parse(e.data);
+    if(msg.type==='inventory_update'){
+      renderInventory(msg.inventory);
+      if(msg.last_event){
+        addFeedEvent(msg.last_event.event,msg.last_event.item);
+        const scanEl=document.getElementById('scan-status');
+        if(scanEl)scanEl.innerHTML=`<div class="pill-dot" style="background:var(--glow)"></div>${msg.last_event.event} · ${msg.last_event.item}`;
+      }
+    }
+  };
+  ws.onclose=()=>setTimeout(connectWS,2000);
+  ws.onerror=()=>ws.close();
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  window.copyPrompt=function(){
+    const text=document.getElementById('rufus-text').innerText; const btn=document.getElementById('copy-btn');
+    navigator.clipboard.writeText(text).then(()=>{
+      const orig=btn.innerText; btn.innerText='Prompt Copied! 👍'; btn.style.background='white'; btn.style.color='#1a2415';
+      setTimeout(()=>{btn.innerText=orig;btn.style.background='#6dde4a';btn.style.color='#1a2415';},2000);
+    });
+  };
+  document.querySelectorAll('.sb-item').forEach(item=>{
+    item.addEventListener('click',()=>{
+      document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active')); item.classList.add('active');
+      const txt=item.innerText.toLowerCase();
+      if(txt.includes('all items'))activeFilter='all'; else if(txt.includes('low stock'))activeFilter='low';
+      applyFilter();
+    });
+  });
+  document.querySelectorAll('a[href^="#"]').forEach(a=>{
+    a.addEventListener('click',e=>{e.preventDefault();document.querySelector(a.getAttribute('href'))?.scrollIntoView({behavior:'smooth'});});
+  });
+  document.querySelectorAll('.win-tab').forEach(tab=>{
+    tab.addEventListener('click',()=>{document.querySelectorAll('.win-tab').forEach(t=>t.classList.remove('active'));tab.classList.add('active');});
+  });
+  const input=document.getElementById('dish-input');
+  if(input)input.addEventListener('keydown',e=>{if(e.key==='Enter')checkDish();});
+  connectWS();
+});
+</script>
+</body>
+</html>
