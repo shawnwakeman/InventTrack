@@ -5,14 +5,17 @@ from collections import deque, defaultdict
 from ultralytics import YOLO
 
 # ── config ───────────────────────────────────────────────────────────────────
-CONFIDENCE_THRESHOLD = 0.35
+CONFIDENCE_THRESHOLD = 0.5
 SHARPNESS_THRESHOLD  = 5.0
 DEVICE               = 'mps'
 
 # ── camera source ─────────────────────────────────────────────────────────────
+# Use USB camera if True. On macOS with an iPhone, enable Continuity Camera in system settings
+# so the phone appears as an AVFoundation device. The script will attempt the configured
+# CAMERA_INDEX and print available AVFoundation indexes if it cannot open it.
 USE_USB      = False
 DROIDCAM_URL = "http://10.165.99.206:4747/video"
-CAMERA_INDEX = 1
+CAMERA_INDEX = 1  # change this if your iPhone camera appears on a different index
 
 WARMUP_SECONDS    = 1.0
 MAX_MISSED_FRAMES = 30
@@ -20,10 +23,10 @@ INFERENCE_WIDTH   = 640
 INFERENCE_HEIGHT  = 480
 
 # ── detection filters ─────────────────────────────────────────────────────────
-ALLOWED_CLASSES   = {39}
-BLACKLIST_CLASSES = {0}
+ALLOWED_CLASSES   = {0}
+BLACKLIST_CLASSES = set()
 MIN_BBOX_AREA     = 3000
-MAX_BBOX_AREA     = 55000
+MAX_BBOX_AREA     = 550000
 MIN_ASPECT_RATIO  = 0.5
 
 # ── boundary config ───────────────────────────────────────────────────────────
@@ -57,7 +60,7 @@ RELINK_RADIUS  = 120
 RELINK_TIMEOUT = 90
 # ─────────────────────────────────────────────────────────────────────────────
 
-model = YOLO('yolov8n.pt')
+model = YOLO('trained_model.pt')
 model.to(DEVICE)
 print("warming up MPS...")
 model(np.zeros((INFERENCE_HEIGHT, INFERENCE_WIDTH, 3), dtype=np.uint8), verbose=False)
@@ -474,11 +477,35 @@ def draw_frame(frame, detections, rejected, zone_tracker,
     return frame
 
 
+# ── USB camera helpers ─────────────────────────────────────────────────────────
+def _list_usb_cameras(max_index: int = 8):
+    available = []
+    for idx in range(max_index):
+        cap = cv2.VideoCapture(idx, cv2.CAP_AVFOUNDATION)
+        if cap is not None and cap.isOpened():
+            ret, _ = cap.read()
+            if ret:
+                available.append(idx)
+            cap.release()
+    return available
+
+
 # ── main loop ─────────────────────────────────────────────────────────────────
 def main():
     if USE_USB:
         print(f"opening USB camera index {CAMERA_INDEX}...")
         cap = cv2.VideoCapture(CAMERA_INDEX, cv2.CAP_AVFOUNDATION)
+        if not cap.isOpened():
+            print(f"failed to open usb camera index {CAMERA_INDEX}")
+            cap.release()
+            available = _list_usb_cameras(8)
+            if available:
+                print("available AVFoundation camera indexes:", available)
+                print("set CAMERA_INDEX to the index that corresponds to your iPhone camera")
+            else:
+                print("no AVFoundation cameras were detected. Make sure your iPhone Continuity Camera is enabled and connected.")
+            return
+
         cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
         cap.set(cv2.CAP_PROP_FRAME_WIDTH,  INFERENCE_WIDTH)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, INFERENCE_HEIGHT)
