@@ -1,4 +1,4 @@
-# 📦 InventTrack
+# TnventTrack
 
 **Your fridge, always accounted for.**
 
@@ -6,7 +6,7 @@ InventTrack is a real-time fridge inventory system built for Hackathon 2026. A p
 
 ---
 
-## ✨ Features
+## Features
 
 - **Custom object detection.** A YOLOv8 model fine-tuned on fridge items (currently `coke_can`, `doritos`, and `lemon`).
 - **Persistent multi-object tracking.** ByteTrack with a custom config, plus a `TrackBridge` layer that re-links tracks that briefly drop out so one item doesn't get counted twice.
@@ -20,7 +20,7 @@ InventTrack is a real-time fridge inventory system built for Hackathon 2026. A p
 
 ---
 
-## 🧠 How It Works
+## How It Works
 
 ```
 ┌──────────────┐  video   ┌──────────────────────────────┐  POST /update-vision  ┌─────────────────┐  WebSocket  ┌───────────┐
@@ -39,7 +39,7 @@ InventTrack is a real-time fridge inventory system built for Hackathon 2026. A p
 
 ---
 
-## 🗂️ Project Structure
+## Project Structure
 
 ```
 InventTrack/
@@ -58,7 +58,7 @@ InventTrack/
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Requirements
 
@@ -124,7 +124,7 @@ python preception_static.py path/to/image.jpg
 
 ---
 
-## 🔌 API Reference
+## API Reference
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -141,7 +141,7 @@ Stock status is based on count: `0` is Empty, `1` is Low, `2` is Medium, and `3+
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 **Vision:** Ultralytics YOLOv8, ByteTrack, OpenCV, NumPy, PyTorch (MPS)
 **Backend:** FastAPI, Uvicorn, WebSockets, OpenAI API (GPT-4o-mini)
@@ -150,14 +150,14 @@ Stock status is based on count: `0` is Empty, `1` is Low, `2` is Medium, and `3+
 
 ---
 
-## ⚠️ Known Limitations
+## Known Limitations
 
 - The model currently recognizes three item classes. Adding more means retraining `trained_model.pt`.
 - The trained model's class labels were shuffled during training, so `perception.py` corrects them with a `CLASS_REMAP` table. Retraining with fixed labels would remove the need for it.
 - Inventory is held in memory and resets when the server restarts.
 - The pipeline targets macOS; other platforms need `DEVICE` and the camera backend changed.
 
-## 🔭 Future Work
+## Future Work
 
 - Expand the dataset to cover common groceries
 - Persist inventory in a database
